@@ -1,0 +1,6 @@
+build/*
+traces/*
+.trace
+.coverage*
+scripts/node_modules/*
+scripts/.env
