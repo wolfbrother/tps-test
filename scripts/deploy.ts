@@ -10,8 +10,8 @@ import { fileURLToPath } from 'url'; // 新增导入
 
 dotenv.config();
 
-// ================= 配置区域 =================
-const NETWORK = 'testnet'; 
+type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
+const NETWORK = (process.env.NETWORK || 'testnet') as SuiNetwork
 // ===========================================
 
 // 【修复关键点】手动定义 __dirname

@@ -15,6 +15,10 @@
     // "types": ["node"],
     // and npm install -D @types/node
 
+    "moduleResolution": "node",
+    "resolveJsonModule": true,  // <--- 必须开启
+    "esModuleInterop": true,
+
     // Other Outputs
     "sourceMap": true,
     "declaration": true,

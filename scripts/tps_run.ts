@@ -5,30 +5,37 @@ import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
 import { getRandomNCounters } from './counter.ts';
 import { getGasCoinIds } from './prepare_gas.ts';
+import { getActiveConfig } from './config';
 
-// 加载 .env 里的私钥
+// 加载环境变量
 dotenv.config();
+const cfg = getActiveConfig();
 
 // ================= 配置区域 =================
-const PACKAGE_ID = '0x7395d305e3530c68adaf0d1b5e932e267048e7daf3f701a0eb2e24125039ee09';
-const MODULE_NAME = 'tps_test';
-const FUNCTION_NAME = 'operate';
+const PACKAGE_ID = cfg.packageId;
+const MODULE_NAME = cfg.module;
+const FUNCTION_NAME = cfg.opOperate;
 const OPERATIONS_PER_TX = 1023;
+
+type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
+const NETWORK = (cfg.network || 'testnet') as SuiNetwork
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ===========================================
 
-async function main() {
     // 1. 初始化 Client 和 账户
-    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
     
-    const privateKey = process.env.SUI_PRIVATE_KEY;
-    if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
+const privateKey = process.env.SUI_PRIVATE_KEY;
+if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
     
-    const { secretKey } = decodeSuiPrivateKey(privateKey);
-    const keypair = Ed25519Keypair.fromSecretKey(secretKey);
-    const address = keypair.getPublicKey().toSuiAddress();
+const { secretKey } = decodeSuiPrivateKey(privateKey);
+const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+const address = keypair.getPublicKey().toSuiAddress();
+console.log(`👤 当前地址: ${address}`);
+
+async function runTest() {
+    console.log(`🚀 开始新一轮并行 TPS 测试`);
     
-    console.log(`🚀 开始执行并行 TPS 测试`);
-    console.log(`👤 当前地址: ${address}`);
 
     // 2. 获取资源列表
     console.log("正在获取可用 Gas 对象...");
@@ -132,4 +139,12 @@ async function runSingleTask(
     }
 }
 
-main();
+async function main() {
+    const iters = 10;
+    for (let i = 0; i < iters; i++) {
+        await runTest();
+        await sleep(4000); 
+    }
+}
+
+main().catch(console.error);

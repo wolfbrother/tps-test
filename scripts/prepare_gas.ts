@@ -3,15 +3,20 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
+import { getActiveConfig } from './config';
 
 // 加载环境变量
 dotenv.config();
+const cfg = getActiveConfig();
 
 // ================= 配置区域 =================
-const MIN_SUI_THRESHOLD = Number(process.env.MIN_SUI_THRESHOLD || 0.04); 
-const TARGET_COUNT = Number(process.env.TARGET_COUNT || 5);
+const MIN_SUI_THRESHOLD = Number(cfg.fee.minSuiThreshold || 0.04); 
+const TARGET_COUNT = Number(cfg.targetCount || 5);
 const MIST_PER_SUI = 1_000_000_000;
-const SPLIT_AMOUNT_SUI = 0.07
+const SPLIT_AMOUNT_SUI = cfg.fee.splitAmountSui || 0.07;
+
+type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
+const NETWORK = (cfg.network || 'testnet') as SuiNetwork
 // ===========================================
 
 /**
@@ -19,7 +24,7 @@ const SPLIT_AMOUNT_SUI = 0.07
  */
 export async function getGasCoinIds(): Promise<string[]> {
     // 1. 初始化基础信息
-    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+    const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
     const privateKey = process.env.SUI_PRIVATE_KEY;
     if (!privateKey) throw new Error('未找到 SUI_PRIVATE_KEY');
     

@@ -4,27 +4,31 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
 
+import { getActiveConfig } from './config';
+
 // 加载环境变量
 dotenv.config();
+const cfg = getActiveConfig();
 
 // ================= 配置区域 =================
 // 1. Package ID
-const PACKAGE_ID = '0x7395d305e3530c68adaf0d1b5e932e267048e7daf3f701a0eb2e24125039ee09';
+const NETWORK = cfg.network;
+const PACKAGE_ID = cfg.packageId;
 
 // 2. 模块名与函数名
-const MODULE_NAME = 'tps_test';
-const FUNCTION_NAME = 'create_counter';
+const MODULE_NAME = cfg.module;
+const FUNCTION_NAME = cfg.opCreateCounter;
 
 // 3. create_counter 需要的那个参数 (根据你提供的 CLI 命令)
-const ARGS_OBJECT_ID = '0x3fea3215978af68d44f53a56ee286c1f0e05042e9daf7f3fb6971b13166c2fbc';
+const ARGS_OBJECT_ID = cfg.globalStateId;
 
 // 4. 单次批量创建的数量 (建议一次 50-100 个，太多可能会导致 Gas 超限或包过大)
-const BATCH_SIZE = 20; 
+const BATCH_SIZE = 40; 
 // ===========================================
 
 async function main() {
     // 1. 初始化 Client
-    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+    const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
 
     // 2. 加载私钥
     const privateKey = process.env.SUI_PRIVATE_KEY;
@@ -89,20 +93,12 @@ async function main() {
                     }
                 }
             }
-            console.log(result.objectChanges)
 
             console.log(`\n🎉 成功创建了 ${createdObjectIds.length} 个计数器对象:`);
             console.log(`===========================================`);
             
             // 打印整齐的 JSON 格式，方便复制
             console.log(JSON.stringify(createdObjectIds, null, 2));
-            
-            console.log(`===========================================`);
-            
-            // 如果你想直接生成可以直接粘贴到 counter.ts 的字符串格式：
-            console.log("\n👇 可直接复制到 counter.ts 的格式:");
-            const tsFormat = createdObjectIds.map(id => `"${id}"`).join(",\n");
-            console.log(tsFormat);
 
         } else {
             console.error(`❌ 交易失败: ${result.effects?.status.error}`);
