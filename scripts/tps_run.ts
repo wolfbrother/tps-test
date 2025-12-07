@@ -70,10 +70,7 @@ async function runTest() {
     const failed = results.filter(r => r.status === 'rejected').length;
 
     console.log(`\n================ 测试报告 ================`);
-    console.log(`总耗时: ${endTime - startTime} ms`);
-    console.log(`并发线程数: ${count}`);
-    console.log(`成功交易: ${successful}`);
-    console.log(`失败交易: ${failed}`);
+    console.log(`总耗时: ${endTime - startTime} ms | 并发线程数: ${count} | 成功交易: ${successful} | 失败交易: ${failed}`);
     console.log(`理论总操作数 (TPS基数): ${successful * OPERATIONS_PER_TX}`);
     console.log(`==========================================`);
 }
@@ -127,7 +124,7 @@ async function runSingleTask(
         });
 
         if (result.effects?.status.status === 'success') {
-            console.log(`✅ [线程 ${taskIndex}] 成功: ${result.digest}`);
+            //console.log(`✅ [线程 ${taskIndex}] 成功: ${result.digest}`);
             return result.digest;
         } else {
             throw new Error(`链上执行失败: ${result.effects?.status.error}`);
@@ -140,10 +137,10 @@ async function runSingleTask(
 }
 
 async function main() {
-    const iters = 10;
+    const iters = 5;
     for (let i = 0; i < iters; i++) {
         await runTest();
-        await sleep(4000); 
+        await sleep(8000); 
     }
 }
 

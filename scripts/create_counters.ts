@@ -23,7 +23,7 @@ const FUNCTION_NAME = cfg.opCreateCounter;
 const ARGS_OBJECT_ID = cfg.globalStateId;
 
 // 4. 单次批量创建的数量 (建议一次 50-100 个，太多可能会导致 Gas 超限或包过大)
-const BATCH_SIZE = 40; 
+const BATCH_SIZE = 30; 
 // ===========================================
 
 async function main() {
