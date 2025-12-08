@@ -13,7 +13,7 @@ const cfg = getActiveConfig();
 const MIN_SUI_THRESHOLD = Number(cfg.fee.minSuiThreshold || 0.04); 
 const TARGET_COUNT = Number(cfg.targetCount || 5);
 const MIST_PER_SUI = 1_000_000_000;
-const SPLIT_AMOUNT_SUI = cfg.fee.splitAmountSui || 0.07;
+const SPLIT_AMOUNT_SUI = Number(cfg.fee.splitAmountSui || 0.07);
 
 type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
 const NETWORK = (cfg.network || 'testnet') as SuiNetwork
@@ -23,7 +23,7 @@ const NETWORK = (cfg.network || 'testnet') as SuiNetwork
  * 主入口：获取符合条件的 Gas 对象 ID 列表
  */
 export async function getGasCoinIds(): Promise<string[]> {
-    // 1. 初始化基础信息
+    // 1. 初始化
     const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
     const privateKey = process.env.SUI_PRIVATE_KEY;
     if (!privateKey) throw new Error('未找到 SUI_PRIVATE_KEY');
@@ -32,140 +32,104 @@ export async function getGasCoinIds(): Promise<string[]> {
     const keypair = Ed25519Keypair.fromSecretKey(secretKey);
     const address = keypair.toSuiAddress();
 
-    // =========================================================
-    // 【新增步骤】在开始任何检查前，先清理多余的小对象
-    await mergeExcessCoins(client, keypair, address);
-    // =========================================================
-
-    // 2. 获取当前满足条件的 Coin (金额筛选)
+    // 2. 检查当前状态
+    // 获取金额达标的 Coins
     const validCoins = await getValidCoins(client, address);
     
-    // 3. 判断是否满足数量要求
+    // 如果数量达标，直接返回
     if (validCoins.length >= TARGET_COUNT) {
+        // console.log(`✅ 当前可用 Gas 对象充足: ${validCoins.length} 个`);
         return validCoins.map(coin => coin.coinObjectId);
     }
 
-    // 4. 如果数量不足，执行拆分逻辑
-    const needed = TARGET_COUNT - validCoins.length;
-    console.log(`⚠️ Gas 对象数量不足 (当前 ${validCoins.length}, 需要 ${TARGET_COUNT})，正在拆分补充 ${needed} 个...`);
+    console.log(`⚠️ Gas 对象不足 (当前有效: ${validCoins.length}, 目标: ${TARGET_COUNT})，开始执行 [合并 -> 拆分] 流程...`);
 
-    // 4.1 找到余额最大的对象
-    const sortedCoins = validCoins.sort((a, b) => Number(b.balance) - Number(a.balance));
-    const primaryCoin = sortedCoins[0];
+    // 3. 执行合并并拆分逻辑
+    await mergeAndSplit(client, keypair, address);
 
-    if (!primaryCoin) {
-        throw new Error("❌ 没有任何余额大于 0.05 SUI 的对象，无法拆分，请先去 Discord 领水！");
+    // 4. 递归调用（等待几秒后重新检查状态）
+    console.log(`⏳ 等待 3 秒以确保链上状态同步...`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    return getGasCoinIds();
+}
+
+/**
+ * 核心逻辑：先合并所有 Coin 到最大的一块，然后从中拆分出指定数量的小块
+ */
+async function mergeAndSplit(client: SuiClient, keypair: Ed25519Keypair, address: string) {
+    // 1. 获取账户下所有的 Coin (不限金额)
+    const allCoins = await getAllCoins(client, address);
+
+    if (allCoins.length === 0) {
+        throw new Error("❌ 账户下没有任何 SUI 对象，请先充值或领水！");
     }
 
-    console.log(`🔨 使用主对象拆分: ${primaryCoin.coinObjectId} (余额: ${(Number(primaryCoin.balance)/MIST_PER_SUI).toFixed(2)} SUI)`);
+    // 2. 排序：余额从大到小
+    const sortedCoins = allCoins.sort((a, b) => Number(b.balance) - Number(a.balance));
+    
+    // 主 Coin (余额最大的)，作为 Gas 支付对象，也是合并的目标容器
+    const primaryCoin = sortedCoins[0];
+    const totalBalance = sortedCoins.reduce((sum, coin) => sum + Number(coin.balance), 0);
+    
+    // 计算需要的总金额 (目标个数 * 单个拆分金额)
+    const requiredAmountMist = BigInt(TARGET_COUNT) * BigInt(Math.floor(SPLIT_AMOUNT_SUI * MIST_PER_SUI));
+    
+    // 检查总余额是否足够 (预留 0.05 SUI 作为 Gas 缓冲)
+    const gasBuffer = BigInt(0.05 * MIST_PER_SUI);
+    if (BigInt(totalBalance) < (requiredAmountMist + gasBuffer)) {
+        const currentSui = (totalBalance / MIST_PER_SUI).toFixed(4);
+        const requiredSui = ((Number(requiredAmountMist) + Number(gasBuffer)) / MIST_PER_SUI).toFixed(4);
+        throw new Error(`❌ 账户总余额不足！当前: ${currentSui} SUI, 需要至少: ${requiredSui} SUI (含Gas)`);
+    }
 
-    // 4.2 构建拆分交易
+    console.log(`🔨 正在重组 Gas 对象...`);
+    console.log(`   - 主对象: ${primaryCoin.coinObjectId} (余额: ${(Number(primaryCoin.balance)/MIST_PER_SUI).toFixed(2)} SUI)`);
+    console.log(`   - 待合并小对象数: ${sortedCoins.length - 1}`);
+    console.log(`   - 目标拆分数量: ${TARGET_COUNT} 个 (每份 ${SPLIT_AMOUNT_SUI} SUI)`);
+
+    // 3. 构建交易 (合并 + 拆分 在同一个 PTB 中完成)
     const tx = new Transaction();
+    
+    // 设置 Gas 支付对象
     tx.setGasPayment([{
         objectId: primaryCoin.coinObjectId,
         version: primaryCoin.version,
         digest: primaryCoin.digest
     }]);
 
-    const splitAmountMist = BigInt(SPLIT_AMOUNT_SUI * MIST_PER_SUI);
+    // Step A: 合并 (Merge)
+    // 将除了主对象以外的所有对象合并进来
+    // 注意：PTB 输入对象数量有限制（通常建议不超过 500），这里做个简单的切片防止溢出
+    const coinsToMerge = sortedCoins.slice(1, 500).map(c => c.coinObjectId);
     
-    for (let i = 0; i < needed; i++) {
-        const [newCoin] = tx.splitCoins(tx.gas, [splitAmountMist]);
-        tx.transferObjects([newCoin], address);
+    if (coinsToMerge.length > 0) {
+        tx.mergeCoins(tx.gas, coinsToMerge);
     }
 
+    // Step B: 拆分 (Split)
+    // 既然我们已经把钱都聚到了 tx.gas 里，现在直接从 tx.gas 拆分
+    // 我们需要拆出 TARGET_COUNT 个新对象
+    const splitAmountMist = BigInt(Math.floor(SPLIT_AMOUNT_SUI * MIST_PER_SUI));
+    const splitAmounts = Array(TARGET_COUNT).fill(splitAmountMist);
+    
+    // splitCoins 返回的是新生成的 Coin 数组
+    const newCoins = tx.splitCoins(tx.gas, splitAmounts);
+
+    // Step C: 传输 (Transfer)
+    // 将新生成的 Coin 转给自己
+    tx.transferObjects([newCoins], address);
+
+    // 4. 执行交易
     try {
         const result = await client.signAndExecuteTransaction({
             signer: keypair,
             transaction: tx,
             options: { showEffects: true }
         });
-        console.log(`🚀 拆分交易发送成功: ${result.digest}`);
+        console.log(`🚀 重组交易成功! Digest: ${result.digest}`);
     } catch (e) {
-        console.error("拆分交易失败:", e);
+        console.error("❌ 重组交易失败:", e);
         throw e;
-    }
-
-    console.log(`⏳ 等待 5 秒以确保链上状态同步...`);
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    // 递归调用
-    return getGasCoinIds();
-}
-
-/**
- * 【新增函数】合并多余的小对象
- * 逻辑：如果 N >= TARGET_COUNT + 2，则合并最小的 (N - TARGET_COUNT) 个对象到最大的对象中
- */
-async function mergeExcessCoins(client: SuiClient, keypair: Ed25519Keypair, address: string) {
-    // 获取账户下所有的 SUI Coin (不限金额)
-    const allCoins = await getAllCoins(client, address);
-    const N = allCoins.length;
-    const limit = TARGET_COUNT + 2;
-
-    // 只有当对象数量确实过多时才触发合并
-    if (N < limit) {
-        return; 
-    }
-
-    console.log(`🧹 检测到对象数量过多 (${N} 个)，开始合并清理...`);
-
-    // 1. 排序：从小到大
-    // (a - b) 结果为负数时 a 排在前面 (升序)
-    const sortedCoins = allCoins.sort((a, b) => Number(a.balance) - Number(b.balance));
-
-    // 2. 确定目标和来源
-    // 最大的对象在数组最后
-    const destinationCoin = sortedCoins[N - 1]; 
-    
-    // 需要合并掉的数量 = 当前总数 - 目标保留数
-    // 比如当前 10 个，目标 5 个，我们要合并掉 5 个，最后剩下 5 个
-    const countToMerge = N - TARGET_COUNT;
-    
-    // 取出最小的 countToMerge 个对象
-    // slice(0, 5) 取前5个(最小的)
-    const sourceCoins = sortedCoins.slice(0, countToMerge);
-    
-    // 防御性检查：确保我们要合并的源里不包含目标对象
-    if (sourceCoins.find(c => c.coinObjectId === destinationCoin.coinObjectId)) {
-        console.warn("合并逻辑异常：源对象包含目标对象，跳过本次合并");
-        return;
-    }
-
-    console.log(`🔄 正在将 ${sourceCoins.length} 个小对象合并到 -> ${destinationCoin.coinObjectId} (大额对象)`);
-
-    // 3. 构建合并交易
-    const tx = new Transaction();
-    
-    // 使用最大的对象作为 Gas 支付方（它也是合并的目标，这很合理）
-    tx.setGasPayment([{
-        objectId: destinationCoin.coinObjectId,
-        version: destinationCoin.version,
-        digest: destinationCoin.digest
-    }]);
-
-    // 批量添加输入
-    // mergeCoins 第一个参数是目标，第二个参数是源对象数组
-    // 注意：PTB 有最大输入限制，这里做个简单截断防止报错 (一次最多合 500 个)
-    const batchSources = sourceCoins.slice(0, 500).map(c => c.coinObjectId);
-    
-    if (batchSources.length > 0) {
-        tx.mergeCoins(tx.gas, batchSources);
-
-        // 4. 执行交易
-        try {
-            const result = await client.signAndExecuteTransaction({
-                signer: keypair,
-                transaction: tx,
-                options: { showEffects: true }
-            });
-            console.log(`✅ 合并完成，Digest: ${result.digest}`);
-            console.log(`⏳ 等待 3 秒同步状态...`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-        } catch (e) {
-            console.error("❌ 合并交易失败:", e);
-            // 合并失败不抛错，继续执行主流程，下次再试
-        }
     }
 }
 

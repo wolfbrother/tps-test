@@ -6,7 +6,13 @@ import * as dotenv from 'dotenv';
 import { getRandomNCounters } from './counter.ts';
 import { getGasCoinIds } from './prepare_gas.ts';
 import { getActiveConfig } from './config.ts';
-import { type CachedObject } from './CachedObject.ts';
+
+
+interface CachedObject {
+    objectId: string;
+    version: string;
+    digest: string;
+}
 
 // 加载环境变量
 dotenv.config();
@@ -24,7 +30,12 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ===========================================
 
     // 1. 初始化 Client 和 账户
-const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+//const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+//const client = new SuiClient({ url: 'https://rpc-testnet.suiscan.xyz:443' });
+//const client = new SuiClient({ url: 'https://sui-testnet-rpc.publicnode.com' });
+const client = new SuiClient({ url: 'https://rpc.ankr.com/sui_testnet/6fb82688c4e23aee232e6a08f76eda5b7132974e3896e4b14fd117b35803391e' });
+
+
     
 const privateKey = process.env.SUI_PRIVATE_KEY;
 if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
@@ -33,7 +44,7 @@ const { secretKey } = decodeSuiPrivateKey(privateKey);
 const keypair = Ed25519Keypair.fromSecretKey(secretKey);
 const address = keypair.getPublicKey().toSuiAddress();
 const beforeBalance = await client.getBalance({ owner: address });
-console.log(`👤 当前地址: ${address}， 网络: ${NETWORK}，当前余额: ${beforeBalance.totalBalance/1_000_000_000}SUI`);
+console.log(`👤 当前地址: ${address}， 网络: ${NETWORK}，当前余额: ${BigInt(beforeBalance.totalBalance)/1_000_000_000n}SUI`);
 
 console.log(`================ 执行测试 ================`);
 // 2. 获取资源列表
@@ -71,8 +82,8 @@ async function runTest() {
     console.log(`总耗时: ${endTime - startTime} ms | 并发通道数: ${count} | 成功通道数: ${successful} | 迭代次数: ${cfg.iters}`);
     console.log(`成功的总操作数 (TPS基数): ${successful * OPERATIONS_PER_TX * cfg.iters}，平均TPS: ${(successful * OPERATIONS_PER_TX * cfg.iters*1000 / (endTime - startTime)).toFixed(2)}`);
     const afterBalance = await client.getBalance({ owner: address });
-    const changeBalance = (beforeBalance.totalBalance - afterBalance.totalBalance)/1_000_000_000;
-    console.log(`当前余额: ${afterBalance.totalBalance/1_000_000_000}SUI， 余额减少: ${changeBalance}SUI，平均每次迭代消耗 ${(changeBalance/cfg.iters).toFixed(2)}SUI`);
+    const changeBalance = Number(BigInt(beforeBalance.totalBalance) - BigInt(afterBalance.totalBalance))/1_000_000_000;
+    console.log(`当前余额: ${Number(afterBalance.totalBalance)/1_000_000_000}SUI， 余额减少: ${changeBalance}SUI，平均每次迭代消耗 ${(changeBalance/cfg.iters).toFixed(2)}SUI`);
     console.log(`==========================================`);
 }
 
@@ -140,10 +151,10 @@ async function runSingleTask(
             if (result.objectChanges) {
                 // 在变更列表中找到 Gas 对象
                 const gasChange = result.objectChanges.find(
-                    c => c.type === 'mutated' && c.objectId === currentGas.objectId
+                    c => c.type === 'mutated' && 'objectId' in c && c.objectId === currentGas.objectId
                 );
 
-                if (gasChange && 'version' in gasChange) {
+                if (gasChange && gasChange.type === 'mutated' && 'version' in gasChange && 'digest' in gasChange) {
                     // 更新缓存，闭环完成
                     currentGas = {
                         objectId: gasChange.objectId,

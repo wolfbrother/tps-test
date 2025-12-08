@@ -1,8 +1,20 @@
 {
   "network": "testnet",
   "targetCount": 70,
-  "iters": 5,
-  "iterInterval": 8,
+  "iters": 100,
+  "iterInterval": 2,
+  "startTime": "2023-12-09 14:30:05",
+  "rpcs": {
+    "testnet": [
+      "https://rpc-testnet.suiscan.xyz:443",
+      "https://sui-testnet-rpc.publicnode.com",
+      "https://rpc.ankr.com/sui_testnet/6fb82688c4e23aee232e6a08f76eda5b7132974e3896e4b14fd117b35803391e"
+    ],
+    "mainnet": [
+      "https://rpc-mainnet.suiscan.xyz:443",
+      "https://sui-mainnet-rpc.publicnode.com"
+    ]
+  },
   "object":   {
     "module": "tps_test",
     "opCreateCounter": "create_counter",
