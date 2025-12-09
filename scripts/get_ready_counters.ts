@@ -4,123 +4,123 @@ import { getActiveConfig } from './config.ts';
 import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const cfg = getActiveConfig();
-const globalState = cfg.globalStateId;
 
-async function fetchAllTxsForFilter(client: SuiClient, filterValue: string) {
-	const limit = 100; // 每页大小
-	let cursor: string | null = null;
-	const all: any[] = [];
+// =================配置区域=================
 
-	// 一组可尝试的 filter 形态（从最常见到备用）
-	const candidateFilters: any[] = [
-		{ InputObject: filterValue },
-		{ InputObject: { objectId: filterValue } },
-		{ InputObject: [filterValue] },
-		{ MutatedObject: filterValue },
-		{ MutatedObject: { objectId: filterValue } },
-		{ ChangedObject: filterValue },
-		{ ChangedObject: { objectId: filterValue } },
-		{ FromAddress: filterValue },
-		{ ToAddress: filterValue },
-	];
+// 请替换为你实际部署后的 GlobalState 对象 ID
+const GLOBAL_STATE_ID = cfg.globalStateId;
 
-	// 尝试每一种 filter 形态，直到 RPC 接受为止
-	let workingFilter: any | null = null;
-	for (const f of candidateFilters) {
-		try {
-			// 只请求一页用于验证 filter 是否被 RPC 接受
-			await client.queryTransactionBlocks({ filter: f, cursor: null, limit: 1 });
-			workingFilter = f;
-			// console.log(`使用 filter 形态: ${JSON.stringify(f)}`);
-			break;
-		} catch (e: any) {
-			// 如果是参数无效，继续尝试其它形态；否则抛出
-			if (e && e.code === -32602) {
-				continue;
-			}
-			throw e;
-		}
-	}
+type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
+const NETWORK = (cfg.network || 'testnet') as SuiNetwork
 
-	if (!workingFilter) {
-		throw new Error('无法为 queryTransactionBlocks 找到兼容的 filter 形态，请检查 RPC 版本或对象 ID');
-	}
-
-	// 使用被接受的形态分页拉取全部结果
-	while (true) {
-		const res = await client.queryTransactionBlocks({ filter: workingFilter, cursor, limit });
-		if (!res) break;
-
-		// 支持两种返回形态：旧版数组直接返回或新版分页对象 { data: [], nextCursor }
-		let items: any[] = [];
-		if (Array.isArray(res)) {
-			items = res;
-		} else if ('data' in res && Array.isArray((res as any).data)) {
-			items = (res as any).data;
-		} else if ((res as any).transactions && Array.isArray((res as any).transactions)) {
-			items = (res as any).transactions;
-		}
-
-		if (items.length === 0) break;
-		all.push(...items);
-
-		// 优先使用 RPC 返回的 nextCursor / cursor 字段
-		const nextCursor = (res as any).nextCursor ?? (res as any).cursor ?? null;
-		if (nextCursor) {
-			cursor = nextCursor as string;
-			continue;
-		}
-
-		// 否则退回到使用最后一条的 digest
-		const last = items[items.length - 1];
-		cursor = (last as any).digest ?? null;
-		if (!cursor) break;
-	}
-
-	return all;
-}
+// =========================================
 
 async function main() {
-	if (!globalState) {
-		console.error('请在 config 中配置 `globalStateId`');
-		process.exit(1);
-	}
+    // 1. 初始化客户端
+    const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+    console.log(`正在连接到 ${NETWORK}...`);
 
-	const network = (cfg.network || 'testnet') as any;
-	const client = new SuiClient({ url: getFullnodeUrl(network) });
+    try {
+        // 2. 获取 GlobalState 对象以拿到 registry (Table) ID 和 total_created
+        console.log(`正在读取 GlobalState: ${GLOBAL_STATE_ID}`);
+        const globalStateObj = await client.getObject({
+            id: GLOBAL_STATE_ID,
+            options: { showContent: true }
+        });
 
-	console.log(`查询对象 ${globalState} 的相关交易...`);
+        if (!globalStateObj.data || !globalStateObj.data.content) {
+            throw new Error("无法找到 GlobalState 对象或内容为空");
+        }
 
-	// 查询两类：作为输入对象的交易，和被修改(mutated)的交易
-	const [inputTxs, mutatedTxs] = await Promise.all([
-		fetchAllTxsForFilter(client, globalState),
-		fetchAllTxsForFilter(client, globalState),
-	]);
+        const fields = (globalStateObj.data.content as any).fields;
+        
+        // 这里的字段名对应 Move 合约中的结构体定义
+        const totalCreated = Number(fields.total_created);
+        const registryTableId = fields.registry.fields.id.id;
 
-	// 合并去重（按 digest）
-	const mergedMap = new Map<string, any>();
-	for (const t of inputTxs) mergedMap.set(t.digest, t);
-	for (const t of mutatedTxs) mergedMap.set(t.digest, t);
+        console.log(`Total Created: ${totalCreated}`);
+        console.log(`Registry Table ID: ${registryTableId}`);
 
-	const txs = Array.from(mergedMap.values());
+        if (totalCreated === 0) {
+            console.log("当前没有创建任何 Counter 对象。");
+            return;
+        }
 
-	console.log(`找到 ${txs.length} 条相关交易（包含 InputObject / MutatedObject）:`);
+        // 3. 遍历 Table 获取所有 Counter 的 ID
+        // 由于 key 是从 0 到 total_created - 1 的连续 u64，我们可以生成 key 列表
+        console.log(`正在从 Table 中获取 ${totalCreated} 个 Counter ID...`);
 
-	for (const tx of txs) {
-		const digest = tx.digest;
-		const timestamp = (tx.timestampMs) ? new Date(Number(tx.timestampMs)).toISOString() : 'unknown';
-		const sender = tx.transaction?.data?.sender || tx.transaction?.intent_message?.value?.sender || 'unknown';
-		const status = tx.effects?.status?.status || tx.effects?.status || 'unknown';
-		const changed = tx.objectChanges?.filter((c: any) => (c.objectId === globalState) || (c.digest === globalState)).length || 0;
+        const counterIds: string[] = [];
 
-		console.log(`- digest: ${digest} | sender: ${sender} | time: ${timestamp} | status: ${status} | relatedChanges: ${changed}`);
-	}
+        // 为了防止请求过多导致被限流，我们使用简单的并发控制（例如每批 10 个）
+        const batchSize = 10;
+        for (let i = 0; i < totalCreated; i += batchSize) {
+            const promises = [];
+            for (let j = i; j < i + batchSize && j < totalCreated; j++) {
+                promises.push(
+                    client.getDynamicFieldObject({
+                        parentId: registryTableId,
+                        name: {
+                            type: 'u64',
+                            value: j.toString()
+                        }
+                    })
+                );
+            }
 
-	if (txs.length === 0) console.log('没有找到相关交易。');
+            const results = await Promise.all(promises);
+
+            for (const res of results) {
+                if (res.data && res.data.content) {
+                    const content = res.data.content as any;
+                    const counterId = content.fields.bytes || content.fields.id;
+                    if (typeof counterId === 'string') {
+                        counterIds.push(counterId);
+                    } else if (counterId && typeof counterId === 'object' && typeof counterId.id === 'string') {
+                        counterIds.push(counterId.id);
+                    }
+                }
+            }
+            console.log(`已解析进度: ${Math.min(i + batchSize, totalCreated)} / ${totalCreated}`);
+        }
+
+        //console.log("找到的所有 Counter ID:", counterIds);
+
+        // 4. 批量获取这些 Counter 对象的具体信息 (value)
+        console.log("正在获取所有 Counter 对象的详细信息...");
+
+        // multiGetObjects 一次最多支持查询一定数量的对象（通常是 50），所以需要分块
+        const objectDetails = [];
+        const multiGetChunkSize = 50;
+
+        for (let i = 0; i < counterIds.length; i += multiGetChunkSize) {
+            const chunk = counterIds.slice(i, i + multiGetChunkSize);
+            // 修正：multiGetObjects 只接受字符串数组
+            const chunkRes = await client.multiGetObjects({
+                ids: chunk,
+                options: { showContent: true }
+            });
+            objectDetails.push(...chunkRes);
+        }
+
+        // 5. 收集所有 value 并打印完整列表
+        const allValues: string[] = [];
+        objectDetails.forEach((item) => {
+            if (item.data && item.data.content) {
+                const fields = (item.data.content as any).fields;
+                const value = fields.value;
+                if (typeof value === 'string' || typeof value === 'number') {
+                    allValues.push(String(value));
+                }
+            }
+        });
+
+        console.log("\n========= Counter Values =========");
+        console.log(JSON.stringify(allValues, null, 2));
+
+    } catch (e) {
+        console.error("执行出错:", e);
+    }
 }
 
-main().catch(e => {
-	console.error(e);
-	process.exit(1);
-});
-
+main();

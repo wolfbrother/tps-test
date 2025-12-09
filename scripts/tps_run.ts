@@ -23,6 +23,7 @@ const PACKAGE_ID = cfg.packageId;
 const MODULE_NAME = cfg.module;
 const FUNCTION_NAME = cfg.opOperate;
 const OPERATIONS_PER_TX = 1023;
+const startTimeStr = cfg.startTime;
 
 type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
 const NETWORK = (cfg.network || 'testnet') as SuiNetwork
@@ -30,13 +31,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ===========================================
 
     // 1. 初始化 Client 和 账户
-//const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
 //const client = new SuiClient({ url: 'https://rpc-testnet.suiscan.xyz:443' });
 //const client = new SuiClient({ url: 'https://sui-testnet-rpc.publicnode.com' });
-const client = new SuiClient({ url: 'https://rpc.ankr.com/sui_testnet/6fb82688c4e23aee232e6a08f76eda5b7132974e3896e4b14fd117b35803391e' });
 
-
-    
 const privateKey = process.env.SUI_PRIVATE_KEY;
 if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
     
@@ -180,7 +178,50 @@ async function runSingleTask(
 
     return digests[digests.length - 1];
 }
+
+/**
+ * 将时间字符串解析为 Date 对象，格式: "YYYY-MM-DD HH:mm:ss"
+ * 如果格式不正确或时间已过期，立即返回
+ * 否则等待到指定时间
+ */
+async function waitUntilStartTime(timeStr: string): Promise<void> {
+    // 时间格式: "2023-12-09 14:30:05"
+    const timeRegex = /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/;
+
+    if (!timeRegex.test(timeStr)) {
+        console.log(`⚠️  起始时间格式不合法: "${timeStr}"，将立即开始`);
+        return;
+    }
+
+    try {
+        // 解析时间字符串为 Date 对象
+        const targetTime = new Date(timeStr.replace(' ', 'T')); // 转换为 ISO 格式
+
+        // 验证时间是否有效
+        if (isNaN(targetTime.getTime())) {
+            console.log(`⚠️  起始时间无效: "${timeStr}"，将立即开始`);
+            return;
+        }
+
+        const now = new Date();
+        const diff = targetTime.getTime() - now.getTime();
+
+        if (diff <= 0) {
+            console.log(`⚠️  起始时间已过期或为当前时间，将立即开始`);
+            return;
+        }
+
+        console.log(`⏰ 等待至 ${timeStr}（还需等待 ${(diff / 1000).toFixed(0)} 秒）...`);
+        await sleep(diff);
+        console.log(`✅ 时间已到，开始执行测试`);
+
+    } catch (e) {
+        console.log(`⚠️  解析起始时间失败: ${e}，将立即开始`);
+    }
+}
+
 async function main() {
+    await waitUntilStartTime(startTimeStr);
     await runTest();
 }
 

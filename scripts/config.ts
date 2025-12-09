@@ -26,6 +26,7 @@ export interface AppConfig {
   targetCount: number;
   iters: number;
   iterInterval: number;
+  startTime: string;
   object: {
     module: string;
     opCreateCounter: string;
@@ -65,6 +66,7 @@ export interface ActiveConfig {
   targetCount: number;
   iters: number;
   iterInterval: number;
+  startTime: string;
   module: string;
   opCreateCounter: string;
   opOperate: string;
@@ -89,6 +91,7 @@ export function getActiveConfig(): ActiveConfig {
     targetCount: config.targetCount,
     iters: config.iters,
     iterInterval: config.iterInterval,
+    startTime: config.startTime,
     
     // 通用配置
     module: config.object.module,
