@@ -36,10 +36,17 @@ export async function getGasCoinIds(): Promise<string[]> {
     // 获取金额达标的 Coins
     const validCoins = await getValidCoins(client, address);
     
-    // 如果数量达标，直接返回
+    // 如果数量达标，截取指定数量返回
     if (validCoins.length >= TARGET_COUNT) {
-        // console.log(`✅ 当前可用 Gas 对象充足: ${validCoins.length} 个`);
-        return validCoins.map(coin => coin.coinObjectId);
+        console.log(`✅ 当前可用 Gas 对象充足: ${validCoins.length} 个 (将返回其中余额最大的 ${TARGET_COUNT} 个)`);
+        
+        return validCoins
+            // 按余额降序排序，优先使用余额大的
+            .sort((a, b) => Number(b.balance) - Number(a.balance))
+            // 只取前 TARGET_COUNT 个
+            .slice(0, TARGET_COUNT)
+            // 提取 ID
+            .map(coin => coin.coinObjectId);
     }
 
     console.log(`⚠️ Gas 对象不足 (当前有效: ${validCoins.length}, 目标: ${TARGET_COUNT})，开始执行 [合并 -> 拆分] 流程...`);
@@ -106,18 +113,19 @@ async function mergeAndSplit(client: SuiClient, keypair: Ed25519Keypair, address
         tx.mergeCoins(tx.gas, coinsToMerge);
     }
 
-    // Step B: 拆分 (Split)
-    // 既然我们已经把钱都聚到了 tx.gas 里，现在直接从 tx.gas 拆分
-    // 我们需要拆出 TARGET_COUNT 个新对象
     const splitAmountMist = BigInt(Math.floor(SPLIT_AMOUNT_SUI * MIST_PER_SUI));
-    const splitAmounts = Array(TARGET_COUNT).fill(splitAmountMist);
     
-    // splitCoins 返回的是新生成的 Coin 数组
-    const newCoins = tx.splitCoins(tx.gas, splitAmounts);
+    console.log(`   - 开始执行拆分与分发 (共 ${TARGET_COUNT} 次)...`);
 
-    // Step C: 传输 (Transfer)
-    // 将新生成的 Coin 转给自己
-    tx.transferObjects([newCoins], address);
+    for (let i = 0; i < TARGET_COUNT; i++) {
+        // 1. 从 Gas 对象拆分出 1 个指定金额的新 Coin
+        // 注意：splitCoins 返回的是一个 Result (代表 vector<Coin>)
+        const coin = tx.splitCoins(tx.gas, [splitAmountMist]);
+
+        // 2. 将这个新 Coin 转移给当前地址
+        // SDK 会正确处理这里 Result 的传递
+        tx.transferObjects([coin], address);
+    }
 
     // 4. 执行交易
     try {

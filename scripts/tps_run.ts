@@ -32,8 +32,6 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     // 1. 初始化 Client 和 账户
 const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
-//const client = new SuiClient({ url: 'https://rpc-testnet.suiscan.xyz:443' });
-//const client = new SuiClient({ url: 'https://sui-testnet-rpc.publicnode.com' });
 
 const privateKey = process.env.SUI_PRIVATE_KEY;
 if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
@@ -42,7 +40,7 @@ const { secretKey } = decodeSuiPrivateKey(privateKey);
 const keypair = Ed25519Keypair.fromSecretKey(secretKey);
 const address = keypair.getPublicKey().toSuiAddress();
 const beforeBalance = await client.getBalance({ owner: address });
-console.log(`👤 当前地址: ${address}， 网络: ${NETWORK}，当前余额: ${BigInt(beforeBalance.totalBalance)/1_000_000_000n}SUI`);
+console.log(`👤 当前地址: ${address}， 网络: ${NETWORK}，当前余额: ${Number(beforeBalance.totalBalance)/1_000_000_000}SUI`);
 
 console.log(`================ 执行测试 ================`);
 // 2. 获取资源列表

@@ -1,7 +1,7 @@
 {
   "network": "mainnet",
-  "targetCount": 5,
-  "iters": 10,
+  "targetCount": 8,
+  "iters": 2,
   "iterInterval": 2,
   "startTime": "2025-12-09 22:39:05",
   "rpcs": {
