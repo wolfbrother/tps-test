@@ -1,9 +1,10 @@
-build/*
-traces/*
-.trace
-.coverage*
 scripts/node_modules/*
 scripts/.env
-scripts/minimal_test/build/*
-scripts/minimal_test/traces/*
-scripts/minimal_test/.trace
+minimal-test/build/*
+minimal-test/traces/*
+minimal-test/.coverage*
+minimal-test/.trace
+tps-test/build/*
+tps-test/traces/*
+tps-test/.trace
+tps-test/.coverage*
