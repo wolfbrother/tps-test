@@ -25,7 +25,7 @@ async function main() {
 
     // 1. 计算 Move 项目的绝对路径
     // 现在 __dirname 可以正常使用了
-    const ABSOLUTE_PROJECT_PATH = path.resolve(__dirname, '../minimal-test/');
+    const ABSOLUTE_PROJECT_PATH = path.resolve(__dirname, '../minimal_test/');
     
     console.log(`📂 项目绝对路径: ${ABSOLUTE_PROJECT_PATH}`);
 
