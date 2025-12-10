@@ -6,10 +6,12 @@
   "startTime": "2025-12-09 22:39:05",
   "rpcs": {
     "testnet": [
+      "https://fullnode.testnet.sui.io:443",
       "https://rpc-testnet.suiscan.xyz:443",
       "https://sui-testnet-rpc.publicnode.com"
     ],
     "mainnet": [
+      "https://fullnode.mainnet.sui.io:443",
       "https://rpc-mainnet.suiscan.xyz:443",
       "https://sui-mainnet-rpc.publicnode.com"
     ]
