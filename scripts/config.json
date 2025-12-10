@@ -1,5 +1,5 @@
 {
-  "network": "mainnet",
+  "network": "testnet",
   "targetCount": 8,
   "iters": 2,
   "iterInterval": 2,

@@ -43,7 +43,7 @@
 ```bash
 cd scripts
 npm init -y
-npm install
+npm install @mysten/sui dotenv bip39 typescript ts-node @types/node @types/bip39
 ```
 
 ### 2. 配置私钥

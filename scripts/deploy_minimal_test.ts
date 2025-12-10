@@ -6,7 +6,7 @@ import * as dotenv from 'dotenv';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url'; // 新增导入
+import { fileURLToPath } from 'url';
 import { getActiveConfig } from './config.ts';
 
 dotenv.config();
@@ -14,25 +14,26 @@ const cfg = getActiveConfig();
 
 type SuiNetwork = 'mainnet' | 'testnet' | 'devnet' | 'localnet';
 const NETWORK = (cfg.network || 'testnet') as SuiNetwork
+
 // ===========================================
 
-// 【修复关键点】手动定义 __dirname
+// 手动定义 __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function main() {
-    console.log(">>> 初始化部署脚本...");
+    console.log(">>> 初始化部署脚本 (Target: minimal_test)...");
 
-    // 1. 计算 Move 项目的绝对路径
-    // 现在 __dirname 可以正常使用了
-    const ABSOLUTE_PROJECT_PATH = path.resolve(__dirname, '../');
+    // 【修改核心点】计算 Move 项目的绝对路径
+    // 原脚本是 '../' (上一级)，这里改为 'minimal_test' (当前目录下的子目录)
+    const ABSOLUTE_PROJECT_PATH = path.resolve(__dirname, 'minimal_test');
     
     console.log(`📂 项目绝对路径: ${ABSOLUTE_PROJECT_PATH}`);
 
-    // 检查一下 Move.toml 是否真的存在，避免后面报错看不懂
+    // 检查一下 Move.toml 是否真的存在
     const tomlPath = path.join(ABSOLUTE_PROJECT_PATH, 'Move.toml');
     if (!fs.existsSync(tomlPath)) {
-        throw new Error(`找不到 Move.toml 文件！请检查路径是否正确: ${tomlPath}`);
+        throw new Error(`找不到 Move.toml 文件！请检查目录是否存在或路径是否正确: ${tomlPath}`);
     }
 
     const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
@@ -55,8 +56,7 @@ async function main() {
     
     let buildOutput;
     try {
-        // 【修改点 1】去掉 --path 参数
-        // 因为我们下面通过 cwd 选项直接切换到该目录下执行，就像你手动 cd .. 一样
+        // 不需要 --path 参数，依靠 cwd 切换上下文
         const command = `sui move build --dump-bytecode-as-base64`;
         
         console.log(`   工作目录: ${ABSOLUTE_PROJECT_PATH}`);
@@ -66,13 +66,12 @@ async function main() {
             encoding: 'utf-8', 
             stdio: 'pipe', 
             maxBuffer: 10 * 1024 * 1024,
-            // 【修改点 2】关键！设置当前工作目录 (Current Working Directory) 为项目根目录
+            // 关键：设置当前工作目录为 minimal_test 文件夹
             cwd: ABSOLUTE_PROJECT_PATH 
         }); 
         
         buildOutput = JSON.parse(stdout);
     } catch (e: any) {
-        // ... 错误处理代码保持不变 ...
         console.error("\n❌ 编译命令执行失败！");
         if (e.stderr) {
             console.error("↓↓↓ 详细错误日志 (STDERR) ↓↓↓");
@@ -99,7 +98,7 @@ async function main() {
 
     // 6. 发送交易
     console.log("\n🚀 正在发送部署交易...");
-    const startTime = Date.now();
+    // const startTime = Date.now(); // 未使用的变量可注释掉
 
     try {
         const result = await client.signAndExecuteTransaction({
@@ -111,7 +110,7 @@ async function main() {
             }
         });
 
-        const endTime = Date.now();
+        // const endTime = Date.now(); // 未使用的变量可注释掉
 
         if (result.effects?.status.status === 'success') {
             console.log(`✅ 部署成功! Digest: ${result.digest}`);
