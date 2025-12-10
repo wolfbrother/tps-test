@@ -42,6 +42,10 @@ export interface AppConfig {
     mainnet: string[];
     testnet: string[];
   };
+  rpcs: {
+    mainnet: string[];
+    testnet: string[];
+  };
 }
 
 // ==========================================
@@ -75,6 +79,7 @@ export interface ActiveConfig {
   upgradeCapId: string;
   fee: FeeConfig;
   counterList: string[];
+  rpcList: string[];
 }
 
 /**
@@ -107,6 +112,9 @@ export function getActiveConfig(): ActiveConfig {
     fee: config.fee[currentNetwork],
     
     // 特定网络的 Counter 列表
-    counterList: config.counters[currentNetwork]
+    counterList: config.counters[currentNetwork],
+    
+    // 特定网络的 RPC 列表
+    rpcList: config.rpcs[currentNetwork]
   };
 }

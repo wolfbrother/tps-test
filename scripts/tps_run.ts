@@ -30,8 +30,11 @@ const NETWORK = (cfg.network || 'testnet') as SuiNetwork
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ===========================================
 
-    // 1. 初始化 Client 和 账户
-const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+const CLIENT_INDEX = 0;
+const client = !cfg.rpcList[0]
+    ? new SuiClient({ url: getFullnodeUrl(NETWORK) })
+    : new SuiClient({ url: cfg.rpcList[CLIENT_INDEX] as string });
+
 
 const privateKey = process.env.SUI_PRIVATE_KEY;
 if (!privateKey) throw new Error('请在 .env 文件中配置 SUI_PRIVATE_KEY');
