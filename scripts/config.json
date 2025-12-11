@@ -1,7 +1,8 @@
 {
   "network": "testnet",
-  "targetCount": 8,
-  "iters": 2,
+  "targetCount": 50,
+  "startCounterIndex": 0,
+  "iters": 5,
   "iterInterval": 2,
   "startTime": "2025-12-09 22:39:05",
   "rpcs": {
@@ -16,6 +17,7 @@
       "https://sui-mainnet-rpc.publicnode.com"
     ]
   },
+  "rpcIndex": 1,
   "object":   {
     "module": "tps_test",
     "opCreateCounter": "create_counter",

@@ -3,7 +3,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
-import { getRandomNCounters } from './counter.ts';
+import { getRandomNCounters, getNCounters } from './get_counters.ts';
 import { getGasCoinIds } from './prepare_gas.ts';
 import { getActiveConfig } from './config.ts';
 
@@ -30,8 +30,8 @@ const NETWORK = (cfg.network || 'testnet') as SuiNetwork
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ===========================================
 
-const CLIENT_INDEX = 0;
-const client = !cfg.rpcList[0]
+const CLIENT_INDEX = cfg.rpcIndex || 0;
+const client = !cfg.rpcList[CLIENT_INDEX]
     ? new SuiClient({ url: getFullnodeUrl(NETWORK) })
     : new SuiClient({ url: cfg.rpcList[CLIENT_INDEX] as string });
 
@@ -54,7 +54,8 @@ if (count === 0) throw new Error("没有可用的 Gas 对象，请检查 prepare
 
 // 3. 获取对应数量的随机 Counter
 // 假设 gas 数量肯定小于 counter 池子总数
-const counterIds = getRandomNCounters(address, count);
+//const counterIds = getRandomNCounters(address, count);
+const counterIds = getNCounters(address, count, cfg.startCounterIndex || 0);
 console.log(`✅准备就绪，可用余额对象: ${count} 个, 随机分配计数器对象： ${count} 个, 以此建立并行通道: ${count} 个`);
 
 async function runTest() {

@@ -24,6 +24,8 @@ export interface FeeConfig {
 export interface AppConfig {
   network: NetworkType;
   targetCount: number;
+  startCounterIndex: number;
+  rpcIndex: number;
   iters: number;
   iterInterval: number;
   startTime: string;
@@ -68,6 +70,8 @@ export default config;
 export interface ActiveConfig {
   network: NetworkType;
   targetCount: number;
+  startCounterIndex: number;
+  rpcIndex: number;
   iters: number;
   iterInterval: number;
   startTime: string;
@@ -94,6 +98,8 @@ export function getActiveConfig(): ActiveConfig {
   return {
     network: currentNetwork,
     targetCount: config.targetCount,
+    startCounterIndex: config.startCounterIndex,
+    rpcIndex: config.rpcIndex,
     iters: config.iters,
     iterInterval: config.iterInterval,
     startTime: config.startTime,
