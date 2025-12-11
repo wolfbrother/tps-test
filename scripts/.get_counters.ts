@@ -1,4 +1,4 @@
-import { getActiveConfig } from './config';
+import { getActiveConfig } from './.config';
 
 const cfg = getActiveConfig();
 // 1. 定义字符串池

@@ -3,7 +3,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
-import { getActiveConfig } from './config';
+import { getActiveConfig } from './.config';
 
 // 加载环境变量
 dotenv.config();

@@ -7,7 +7,7 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { getActiveConfig } from './config.ts';
+import { getActiveConfig } from './.config.ts';
 
 dotenv.config();
 const cfg = getActiveConfig();

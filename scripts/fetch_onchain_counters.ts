@@ -1,6 +1,6 @@
 
 
-import { getActiveConfig } from './config.ts';
+import { getActiveConfig } from './.config.ts';
 import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
 
 const cfg = getActiveConfig();

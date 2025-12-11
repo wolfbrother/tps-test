@@ -3,9 +3,9 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import * as dotenv from 'dotenv';
-import { getRandomNCounters, getNCounters } from './get_counters.ts';
-import { getGasCoinIds } from './prepare_gas.ts';
-import { getActiveConfig } from './config.ts';
+import { getRandomNCounters, getNCounters } from './.get_counters.ts';
+import { getGasCoinIds } from './.prepare_gas.ts';
+import { getActiveConfig } from './.config.ts';
 
 
 interface CachedObject {
